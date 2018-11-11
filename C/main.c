@@ -1,182 +1,147 @@
 /*
- * distance.c
  *
- * measures distance between 2 and 70 cm
+ *      Program uses a ATMega328p MCU to query a HC-SR04 ultrasonic module. Then Calculates and displays the distance to a object in cm on the NewHaven display.
  *
- * Created: 6-11-2018 15:41
- *  Author: Maarten
- */ 
-
-/* 
- * HC-SR04
- * trigger to sensor : uno 0 (PD0) output
- * echo from sensor  : uno 3 (PD3 = INT1) input
- * 
- * DIO : uno 8  (PB0) data
- * CLK : uno 9  (PB1) clock
- * STB : uno 10 (PB2) strobe
+ *      The ultrasonic module is triggered every 60 ms by setting pin PC4 (the trigger) high for 10 us. A change in state on pin PC5 (the echo)
+ *      causes a interrupt. The interrupt checks if PC5 is high. If it is a timer is started that increments every micro second. Once PC5 triggers a
+ *      interrupt again and is low the result is calculated and displayed in centimeters on the NewHaven display. Distance in cm is calculated
+ *      by the amount of microseconds PC5 (the echo) is active high divided by 58.
  *
+ *      Pin placement of ATMega328p:
+ *      Pin PC4				HC-SR04 Trig
+ *      Pin PC5				HC-SR04 Echo
  */
-
-#include <avr/io.h>
-#include <avr/interrupt.h>
 #define F_CPU 16E6
+
+#include <stdio.h>
+#include <avr/io.h>
 #include <util/delay.h>
-#include "distance.h"
+#include <avr/interrupt.h>
+#include "UART.h"
+#include "scheduler.h"
 
-volatile uint16_t gv_counter; // 16 bit counter value
-volatile uint8_t gv_echo; // a flag
+#define UBBRVAL 51
 
-//********** start display ***********
+#define HIGH 0x1
+#define LOW  0x0
 
-void reset_display()
-{
-    // clear memory - all 16 addresses
-    sendCommand(0x40); // set auto increment mode
-    write(strobe, LOW);
-    shiftOut(0xc0);   // set starting address to 0
-    for(uint8_t i = 0; i < 16; i++)
-    {
-        shiftOut(0x00);
-    }
-    write(strobe, HIGH);
-    sendCommand(0x89);  // activate and set brightness to medium
-}
 
-void show_distance(uint16_t cm)
-{
-                        /*0*/ /*1*/ /*2*/ /*3*/ /*4*/ /*5*/ /*6*/ /*7*/ /*8*/ /*9*/
-    uint8_t digits[] = {0x3f, 0x06, 0x5b, 0x4f, 0x66, 0x6d, 0x7d, 0x07, 0x7f, 0x6f};
-    uint8_t ar[8] = {0};
-    uint8_t digit = 0, i = 0;
-    uint8_t temp, nrs, spaces;
-    
-    // cm=1234 -> ar[0..7] = {4,3,2,1,0,0,0,0}
-    while (cm > 0 && i < 8) {
-        digit = cm % 10;
-        ar[i] = digit;
-        cm = cm / 10;
-        i++;
-    }
-
-    nrs = i;      // 4 digits
-    spaces = 8-i; // 4 leading spaces  
-    
-    // invert array -> ar[0..7] = {0,0,0,0,1,2,3,4}
-    uint8_t n = 7;
-    for (i=0; i<4; i++) {
-        temp = ar[i];
-        ar[i] = ar[n];
-        ar[n] = temp;
-        n--;
-    }
-    
-    write(strobe, LOW);
-    shiftOut(0xc0); // set starting address = 0
-    // leading spaces
-    for (i=0; i<8; i++) {
-        if (i < spaces) {
-            shiftOut(0x00);
-        } else {
-            shiftOut(digits[ar[i]]);
-        }           
-        shiftOut(0x00); // the dot
-    }
-    
-    write(strobe, HIGH);
-}
-
-void sendCommand(uint8_t value)
-{
-    write(strobe, LOW);
-    shiftOut(value);
-    write(strobe, HIGH);
-}
-
-// write value to pin
-void write(uint8_t pin, uint8_t val)
-{
-    if (val == LOW) {
-        PORTB &= ~(_BV(pin)); // clear bit
-    } else {
-        PORTB |= _BV(pin); // set bit
-    }
-}
-
-// shift out value to data
-void shiftOut (uint8_t val)
-{
-    uint8_t i;
-    for (i = 0; i < 8; i++)  {
-        write(clock, LOW);   // bit valid on rising edge
-        write(data, val & 1 ? HIGH : LOW); // lsb first
-        val = val >> 1;
-        write(clock, HIGH);
-    }
-}
-
-//********** end display ***********
-
-void init_ports(void)
-{
-    DDRD = (1 << 0);
-	DDRD = ~(1 << 3);
+void init() {
+	DDRD = 0xff;
 	DDRB = 0xFF;
+	DDRB &= ~(1<<DDB0);
+	// Set Pin PB0 as input to read Echo
+	PORTB |= (1<<PB0);
+	// Enable pull up on C5
+	PORTB &= ~(1<<PB1);
+	// put trigger PB1 on low
+
+	PRR &= ~(1<<PRTIM1);
+	// To activate timer1 module
+	TCNT1 = 0;
+	// Initial timer value
+	TCCR1B |= (1<<CS11);
+	// prescaler of 8
+	TCCR1B |= (1<<ICES1);
+	// First capture on rising edge
+
+	PCICR = (1<<PCIE0);	// Enable PCINT[7:0] we use pin PB0 which is PCINT0
+	PCMSK0 = (1<<PCINT0);// Sets PB0 as interrupts port
+	sei();				// Enable Interrupts
 }
 
-void init_timer(void)
-// prescaling : max time = 2^16/16E6 = 4.1 ms, 4.1 >> 2.3, so no prescaling required
-// normal mode, no prescale, stop timer
+
+int readADC(uint8_t ADCport)
 {
-    TCCR1A = 0;
-    TCCR1B = 0;
+	// use ADC port
+	ADMUX = ADCport;
+	ADMUX |= (1 << REFS0);
+	ADMUX &= ~(1 << ADLAR);
+	ADCSRA |= (1 << ADPS2) | (1 << ADPS1) | (1 << ADPS0);
+	// Enable ADC
+	ADCSRA |= (1 << ADEN);
+	// Start ADC conversion
+	ADCSRA |= (1 << ADSC);
+	// wait for ADC to finish
+	while(ADCSRA & (1 << ADSC));
+	int ADCvalue;
+	ADCvalue = ADCL;
+	ADCvalue = (ADCH << 8) + ADCvalue;
+	//return ADCvalue
+	return ADCvalue;
 }
 
-void init_ext_int(void)
+void getadc()
 {
-    // any change triggers ext interrupt 1
-    EICRA = (1 << ISC10);
-    EIMSK = (1 << INT1);
-}
+	double ADCvalue = 0;
+	int degrees = 0;
+	while (1) {
+		// reads temperature
+		ADCvalue = readADC(1);
+		// rekent om naar graden C
+		degrees = ((ADCvalue / 1024 * 5)-0.5)*100;
+		// zet het om naar een int
+		degrees = (int) degrees;
 
-
-uint16_t calc_cm(uint16_t counter)
-{
-    return (gv_counter / 16)/58;
-}
-
-int main(void)
-{
-    init_ports();
-	init_timer();
-	reset_display();
-	init_ext_int();
-	sei();
-	while (1)
-	{
-		gv_echo = BEGIN;
-		PORTD |= _BV(0);
-		_delay_us(12);
-		PORTD = 0x00;
-		_delay_ms(30);
-		int tmp = calc_cm(gv_counter);
-		show_distance(tmp);
 		_delay_ms(500);
 	}
-	
-	
 }
 
-ISR (INT1_vect)
-{
-    if(gv_echo == BEGIN)
-	{
-		TCNT1 = 0;
-		TCCR1B |= (1 << CS10);
-		gv_echo = END;	
+void send_burst(){
+			PORTB |= (1<<PB1);						// Set trigger on
+			_delay_us(10);							// for 10uS
+			PORTB &= ~(1<<PB1);						// turn off trigger
+}
+
+
+int main() {
+	uart_init();
+	init();
+	SCH_Init_T1();
+	unsigned char ultrasonar;
+	unsigned char run_adc;
+	unsigned char receive;
+	ultrasonar = SCH_Add_Task(send_burst,1,100);
+	//run_adc = SCH_Add_Task(getadc,5,1000);
+	//receive = SCH_Add_Task(recieve,0,100);
+	SCH_Start();
+	while (1) {
+		SCH_Dispatch_Tasks();
+		//encode(1,0x23);
+		_delay_ms(1000);
 	}
-	else {
-		TCCR1B = 0;
-		gv_counter = TCNT1;
+}
+
+
+ISR(PCINT0_vect) {
+	cli();
+	if (bit_is_set(PINB,PB0)) {					// Checks if echo is high
+		TCNT1 = 0;								// Reset Timer
+		PORTB |= (1<<PB3);
+	} else {
+		uint16_t gv_counter = TCNT1;					// Save Timer value
+		uint8_t oldSREG = SREG;
+		double distance;
+		distance = gv_counter/58/2;
+
+		//
+		transmit((int)distance);
+		if (distance < 10){
+			PORTD = 0x80;
+			
+		}
+		else if (distance > 40)
+		{
+			PORTD = 0x20;
+			
+		}
+		else{
+			PORTD = 0x40;
+			
+		}
+		_delay_ms(1000);
+		SREG = oldSREG;							// Enable interrupts
+		PORTB &= ~(1<<PB3);						// Toggle debugging LED
+		sei();
 	}
 }
