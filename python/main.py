@@ -8,7 +8,7 @@ def main():
 
     startinter = Process(target=interface.Window)
     startinter.start()
-    connstart = Process(target=conn.Connection())
+    connstart = Process(target=conn.Connection)
     connstart.start()
     connstart.join()
     startinter.join()

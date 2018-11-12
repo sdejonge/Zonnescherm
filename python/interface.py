@@ -9,16 +9,6 @@ class Window:
         window = Tk()
         self.startwindow(window)
 
-    def new_win(self):
-        # new window definition
-        newwin = Toplevel()
-        newwin.geometry("300x400")
-
-        newentry = Entry(newwin)
-        newentry.pack()
-        display = Label(newwin, text="Humm, see a new window !")
-        display.pack()
-
     def startwindow(self,window):
         window.title('Zeng ltd.')
 
@@ -46,4 +36,22 @@ class Window:
         d.place(relx=0.80, rely=0.30, anchor=CENTER)
 
         window.mainloop()
+
+    def new_win(self):
+        # new window definition
+        newwin = Toplevel()
+        newwin.geometry("300x200")
+
+        display = Label(newwin, text="oprol stand")
+        display.pack()
+        newentry = Entry(newwin)
+        newentry.pack()
+
+        display = Label(newwin, text="uitrol stand")
+        display.pack()
+        newentry = Entry(newwin)
+        newentry.pack()
+
+        save = Button(newwin, text='opslaan')
+        save.pack()
 
