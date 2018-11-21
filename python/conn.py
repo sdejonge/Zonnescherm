@@ -4,7 +4,7 @@ import binascii
 
 class Connection:
 
-    def __init__(self, com='COM3', baudrate=19200, timeout=1):
+    def __init__(self, com='COM4', baudrate=19200, timeout=1):
         # Try to get a connection with the arduino
         try:
             ser = serial.Serial(com, baudrate=baudrate, timeout=timeout)
@@ -19,6 +19,7 @@ class Connection:
 
         # num for x in graph
         num = 1
+        numlicht = 1
         global listforgraph
         global lichtlistforgraph
 
@@ -30,23 +31,30 @@ class Connection:
             # Convert Hex value to ascii
             datatoasc = datatohex[0:6].decode('ascii')
 
-            # sort out first hex number
-            temp = [datatoasc[i:i + n] for i in range(0, 2, n)]
-            licht = [datatoasc[i:i + n] for i in range(2, 4, n)]
-            temp = temp[0]
-            licht = licht[0]
+            type_data = datatoasc[0:1]
+            waarde = datatoasc[1:3]
+            check = datatoasc[3:4]
 
-            # get rid of empty posts
-            if temp and licht is not '':
-                temperature = (int(temp, 16))
-                lichtintensiteit = (int(licht, 16))
-                listforgraph = [num, temperature]
-                lichtlistforgraph = [num, lichtintensiteit]
-                # add up num to make data for graph
-                num += 1
+            if type_data is not '':
+                code = (int(type_data, 16))
+                value = (int(waarde, 16))
+                print(code)
+                print(value)
+                # get rid of empty posts
+                if code == 8:
+                    listforgraph = [num, value]
+                    self.write('temp.txt', listforgraph)
+                    num += 1
+                elif code == 4:
+                    lichtlistforgraph = [numlicht, value]
+                    self.write('licht.txt', lichtlistforgraph)
+                    # add up num to make data for graph
+                    numlicht += 1
 
-                self.write('temp.txt', listforgraph)
-                self.write('licht.txt', lichtlistforgraph)
+
+
+
+
 
     def write(self,filename,listtype):
         i_run_once()

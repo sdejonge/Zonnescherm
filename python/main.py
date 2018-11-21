@@ -7,9 +7,11 @@ def main():
     # maakt het object window met verschillende processen
 
     startinter = Process(target=interface.Window)
-    startinter.start()
     connstart = Process(target=conn.Connection)
+
+    startinter.start()
     connstart.start()
+
     connstart.join()
     startinter.join()
 
