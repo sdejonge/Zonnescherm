@@ -13,15 +13,15 @@ class Window:
 
     def backgrup(self):
         print('I was at up')
-        thr = Thread(target=conn.go_up1)
-        thr.start()
-        thr.join()
+        thrup = Thread(target=conn.go_up1)
+        thrup.start()
+        thrup.join()
 
     def backgrdown(self):
         print('I was at down')
-        thr = Thread(target=conn.go_down())
-        thr.start()
-        thr.join()
+        thrdown = Thread(target=conn.go_down())
+        thrdown.start()
+        thrdown.join()
 
     def startwindow(self,window):
         window.title('Zeng ltd.')
