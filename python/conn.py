@@ -4,6 +4,7 @@ import binascii
 ser = serial.Serial
 
 
+# Class connection makes the connection with the arduino and does stuff with it
 class Connection:
 
     def __init__(self, com='COM3', baudrate=19200, timeout=1):
@@ -47,12 +48,12 @@ class Connection:
                     # add up num to make data for graph
                     numlicht += 1
 
+    # Write data to files
     def write(self, filename, listtype):
         i_run_once()
         file = open(filename,'a')
         file.write(''.join(str(listtype).strip("[]")) + '\n')
         file.close()
-
 
 
 i_run_once_has_been_run = False
@@ -69,7 +70,8 @@ def go_down():
     print("down")
     ser.write(b"d")
 
-# function to clear text document
+
+# function to clear text document on startup (runs only once, hence the name)
 def i_run_once():
     global i_run_once_has_been_run
 

@@ -4,7 +4,6 @@ from threading import Thread
 
 
 def main():
-    # maakt het object window met verschillende processen
 
     startinter = Thread(target=interface.Window)
     connstart = Thread(target=conn.Connection)
