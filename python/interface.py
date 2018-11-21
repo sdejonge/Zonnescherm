@@ -1,5 +1,7 @@
 from tkinter import *
 import graphmaker
+import conn
+from threading import Thread
 
 
 class Window:
@@ -8,6 +10,18 @@ class Window:
 
         window = Tk()
         self.startwindow(window)
+
+    def backgrup(self):
+        print('I was at up')
+        thr = Thread(target=conn.go_up1)
+        thr.start()
+        thr.join()
+
+    def backgrdown(self):
+        print('I was at down')
+        thr = Thread(target=conn.go_down())
+        thr.start()
+        thr.join()
 
     def startwindow(self,window):
         window.title('Zeng ltd.')
@@ -20,8 +34,8 @@ class Window:
         photo3 = PhotoImage(file="img/cogs.GIF")
         photo4 = PhotoImage(file="img/chart-bar.GIF")
 
-        a = Button(window, image=photo1)
-        b = Button(window, image=photo2)
+        a = Button(window, image=photo1, command=lambda:self.backgrup())
+        b = Button(window, image=photo2, command=lambda:self.backgrdown())
         c = Button(window, image=photo3, command=self.new_win)
         d = Button(window, image=photo4, command=graphmaker.MakeGraph)
 
@@ -36,6 +50,7 @@ class Window:
         d.place(relx=0.80, rely=0.30, anchor=CENTER)
 
         window.mainloop()
+
 
     def new_win(self):
         # new window definition

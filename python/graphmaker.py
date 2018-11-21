@@ -8,9 +8,11 @@ class MakeGraph:
     def __init__(self):
         style.use('fivethirtyeight')
 
-        fig = plt.figure()
+        fig = plt.figure(figsize=(10,8))
         ax1 = fig.add_subplot(211)
         ax2 = fig.add_subplot(212)
+
+        plt.subplots_adjust(left=0.12, bottom=None, right=None, top=None, wspace=None, hspace=0.50)
 
         def animate(i):
             graph_data = open('temp.txt','r').read()
@@ -25,12 +27,12 @@ class MakeGraph:
                 if len(line) > 1:
                     x, y = line.split(',')
                     xs.append(x)
-                    ys.append(y)
+                    ys.append(float(y))
             for line in lines2:
                 if len(line) > 1:
                     x2, y2 = line.split(',')
                     xs2.append(x2)
-                    ys2.append(y2)
+                    ys2.append(float(y2))
 
             ax1.clear()
             ax1.plot(xs, ys)

@@ -1,13 +1,13 @@
 import interface
 import conn
-from multiprocessing import Process
+from threading import Thread
 
 
 def main():
     # maakt het object window met verschillende processen
 
-    startinter = Process(target=interface.Window)
-    connstart = Process(target=conn.Connection)
+    startinter = Thread(target=interface.Window)
+    connstart = Thread(target=conn.Connection)
 
     startinter.start()
     connstart.start()
