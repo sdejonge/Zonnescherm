@@ -128,9 +128,6 @@ int main() {
 	unsigned char run_adc;
 	unsigned char receive;
 	ultrasonar = SCH_Add_Task(send_burst,1,100);
-	roll_down();
-	_delay_ms(1000);
-	roll_up();
 	//run_adc = SCH_Add_Task(getadc,5,1000);
 	//receive = SCH_Add_Task(recieve,0,100);
 	SCH_Start();
