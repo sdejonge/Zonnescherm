@@ -71,86 +71,67 @@ int readADC(uint8_t ADCport)
 	return ADCvalue;
 }
 
-void encode(int sensor, int data){
-	// maakt variabelen aan
-	unsigned char value1;
-	unsigned char value2;
-	unsigned char value3;
-
-	unsigned char first_hex;
-	unsigned char second_hex;
-	unsigned char xor;
-
-	unsigned char temp;
-
-	// zet de eerste 4 bits voor eth eerste hex getal op hun plek
-	first_hex = (sensor & 0x0F)<<4;
-	temp = (data & 0xF0)>>4;
-	// naakt eerste hex waarde
-	first_hex = first_hex | temp;
-	// zet de eerste 4 bits op hun plek voor het 2de hex getal
-	second_hex = (data & 0x0F)<<4;
-
-	// wat bit shiften is nodig voor dat we het Xorren
-	value1 = sensor;
-	value2 = (data & 0xF0)>>4;
-	value3 = data & 0x0F;
-
-	// berekening voor de check
-	xor = value1 ^ value2 ^ value3;
-
-	//maakt de tweede hex waarde
-	second_hex  = second_hex | xor;
-
-	// verstuurt het packet
-	transmit(first_hex);
-	transmit(second_hex);
-	transmit(0x0A);
-}
-
-void send_burst(){
-	// zet de trigger hoog
-	PORTB |= (1<<PB1);
-	// voor 10uS
-	_delay_us(10);
-	// doet de trigger uit
-	PORTB &= ~(1<<PB1);
-	// turn on debugging LED
-	PORTB |= (1<<PB3);
-}
-
-void getsensors()
+void getadc()
 {
 	double ADCvalue = 0;
 	int degrees = 0;
 	while (1) {
 		// reads temperature
 		ADCvalue = readADC(1);
-		// Celsius formule
+		// rekent om naar graden C
 		degrees = ((ADCvalue / 1024 * 5)-0.5)*100;
-		// Int convert
+		// zet het om naar een int
 		degrees = (int) degrees;
 
-		// Encode data & transmit
-		encode(8,degrees);
-		// Encode data & transmit
-		encode(4, readADC(0));
-		send_burst();
-		_delay_ms(1000);
+		_delay_ms(500);
 	}
 }
 
+void send_burst(){
+			PORTB |= (1<<PB1);						// Set trigger on
+			_delay_us(10);							// for 10uS
+			PORTB &= ~(1<<PB1);						// turn off trigger
+}
+
+void led_init()
+{
+	DDRB = 0xFF;
+	DDRD = 0xFF;
+}
+
+void indicator(uint8_t x){
+	while(x < 10){
+		PORTB |= 0b00000100;
+		_delay_ms(250);
+		PORTB &= 0b00000011;
+		_delay_ms(250);
+		x ++;
+	}
+}
+
+void roll_up(){
+	indicator(0);
+	PORTB = 0b00000001;
+}
+
+void roll_down(){
+	indicator(0);
+	PORTB = 0b00000010;
+}
 
 int main() {
 	uart_init();
 	init();
 	SCH_Init_T1();
-	unsigned char run_sensors;
-	//unsigned char ultrasonar;
-	//unsigned char run_adc;
-	//unsigned char receive;
-	//ultrasonar = SCH_Add_Task(send_burst,1,100);
-	run_sensors = SCH_Add_Task(getsensors,5,1000);
+	led_init();
+	unsigned char ultrasonar;
+	unsigned char run_adc;
+	unsigned char receive;
+	ultrasonar = SCH_Add_Task(send_burst,1,100);
+	roll_down();
+	_delay_ms(1000);
+	roll_up();
+	//run_adc = SCH_Add_Task(getadc,5,1000);
 	//receive = SCH_Add_Task(recieve,0,100);
 	SCH_Start();
 	while (1) {
@@ -192,34 +173,4 @@ ISR(PCINT0_vect) {
 		PORTB &= ~(1<<PB3);						// Toggle debugging LED
 		sei();
 	}
-}
-
-ISR(USART_RX_vect)
-{
-	cli();
-while(!(UCSR0A&(1<<RXC0))){};
-// clear the USART interrupt
-char recieved;
-recieved = UDR0;
-char recieved1;
-recieved1 = recieve();
-
-if (recieved == 0x01)
-{
-	PORTD |= (1<<PD3);
-	_delay_ms(1000);
-	if (recieved1 == 0x01)
-	{
-		PORTD |= (1<<PD6);
-		_delay_ms(1000);
-	}
-	else if (recieved1 == 0x02)
-	{
-		PORTD |= (1<<PD5);
-		_delay_ms(1000);
-	}
-}
-_delay_ms(100);
-sei();
-
 }
