@@ -25,6 +25,7 @@
 #define HIGH 0x1
 #define LOW  0x0
 
+char get_char = '\0';
 
 void init() {
 	DDRD = 0xff;
@@ -146,7 +147,7 @@ void getsensors()
 {
 	double ADCvalue = 0;
 	int degrees = 0;
-	while (1) {
+	
 		// reads temperature
 		ADCvalue = readADC(1);
 		// Celsius formule
@@ -159,22 +160,41 @@ void getsensors()
 		// Encode data & transmit
 		encode(4, readADC(0));
 		send_burst();
-		_delay_ms(1000);
+	}
+
+
+void loop_program(){
+	if((UCSR0A & (1<<RXC0))){
+		get_char = recieve();
+		switch(get_char){
+			//
+			case 'o':
+			roll_up();
+			transmit(get_char);
+			break;
+			
+			//
+			case 'd':
+			roll_down();
+			transmit(get_char);
+			break;
+		}		
 	}
 }
-
-
 int main() {
 	uart_init();
 	init();
 	SCH_Init_T1();
 	led_init();
-	unsigned char run_sensors;
+	
+	unsigned char loop_receive;	
+	//unsigned char run_sensors;
 	//unsigned char ultrasonar;
 	//unsigned char run_adc;
 	//unsigned char receive;
 	//ultrasonar = SCH_Add_Task(send_burst,1,100);
-	run_sensors = SCH_Add_Task(getsensors,5,1000);
+	//run_sensors = SCH_Add_Task(getsensors, 3,1000);
+	loop_receive = SCH_Add_Task(loop_program, 5, 1000);
 	//receive = SCH_Add_Task(recieve,0,100);
 	SCH_Start();
 	while (1) {
